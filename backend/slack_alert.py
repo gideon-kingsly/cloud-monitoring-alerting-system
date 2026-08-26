@@ -1,19 +1,36 @@
-import requests
 import os
+import requests
+
 
 def send_slack_alert(message):
 
-    import os
+    slack_webhook_url = os.getenv("SLACK_WEBHOOK_URL")
 
-    SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL")
+    if not slack_webhook_url:
+        return {
+            "success": False,
+            "message": "SLACK_WEBHOOK_URL is not configured"
+        }
 
     payload = {
         "text": message
     }
 
-    response = requests.post(
-        webhook_url,
-        json=payload
-    )
+    try:
+        response = requests.post(
+            slack_webhook_url,
+            json=payload,
+            timeout=10
+        )
 
-    return response.status_code
+        return {
+            "success": response.ok,
+            "status_code": response.status_code
+        }
+
+    except requests.exceptions.RequestException as e:
+
+        return {
+            "success": False,
+            "message": str(e)
+        }
