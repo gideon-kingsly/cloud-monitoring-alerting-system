@@ -1,39 +1,68 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+
 from monitor import get_system_stats, check_website, get_health_status
 from alerts import check_alerts, check_website_alerts
 from database import cursor
-from fastapi import Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from database import cursor
+
 
 app = FastAPI()
+
 templates = Jinja2Templates(directory="templates")
+
+
+# ==============================
+# Home
+# ==============================
 
 @app.get("/")
 def home():
-    return {"message": "Cloud Monitoring API Running"}
+    return {
+        "message": "Cloud Monitoring API Running"
+    }
+
+
+# ==============================
+# System Statistics
+# ==============================
 
 @app.get("/stats")
 def stats():
     return get_system_stats()
 
+
+# ==============================
+# Single Website Check
+# ==============================
+
 @app.get("/website")
 def website_status():
     return check_website("https://www.google.com")
+
+
+# ==============================
+# Health Status
+# ==============================
 
 @app.get("/health")
 def health():
     return get_health_status()
 
+
+# ==============================
+# Website Monitoring
+# ==============================
+
 @app.get("/websites")
 def websites_status():
+
     websites = [
-    "https://google.com",
-    "https://github.com",
-    "https://aws.amazon.com",
-    "https://azure.microsoft.com",
-    "https://chatgpt.com"
+        "https://google.com",
+        "https://github.com",
+        "https://aws.amazon.com",
+        "https://azure.microsoft.com",
+        "https://chatgpt.com"
     ]
 
     results = []
@@ -43,31 +72,46 @@ def websites_status():
 
     return results
 
+
+# ==============================
+# Alerts
+# ==============================
+
 @app.get("/alerts")
 def alerts():
+
     stats = get_system_stats()
+
     return {
         "alerts": check_alerts(stats)
     }
 
 
+# ==============================
+# System History API
+# ==============================
 
 @app.get("/history")
 def history():
 
     cursor.execute("""
-    SELECT timestamp,
-           cpu_usage,
-           memory_usage,
-           disk_usage
-    FROM system_stats
-    ORDER BY id DESC
-    LIMIT 10
+        SELECT timestamp,
+               cpu_usage,
+               memory_usage,
+               disk_usage
+        FROM system_stats
+        ORDER BY id DESC
+        LIMIT 100
     """)
 
     rows = cursor.fetchall()
 
     return rows
+
+
+# ==============================
+# Dashboard
+# ==============================
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
@@ -84,12 +128,13 @@ def dashboard(request: Request):
         check_website("https://github.com"),
         check_website("https://aws.amazon.com"),
         check_website("https://azure.microsoft.com"),
-        check_website("https://chatgpt.com"),
+        check_website("https://chatgpt.com")
     ]
 
+    # Website alerts
     check_website_alerts(websites)
 
-    # Alerts
+    # System alerts
     alerts = check_alerts(stats)
 
     # ==============================
@@ -128,10 +173,29 @@ def dashboard(request: Request):
     # Chart Data
     # ==============================
 
-    timestamps = [row[0][-8:] for row in history][::-1]
-    cpu_history = [row[1] for row in history][::-1]
-    memory_history = [row[2] for row in history][::-1]
-    disk_history = [row[3] for row in history][::-1]
+    timestamps = [
+        row[0][-8:]
+        for row in history
+    ][::-1]
+
+    cpu_history = [
+        row[1]
+        for row in history
+    ][::-1]
+
+    memory_history = [
+        row[2]
+        for row in history
+    ][::-1]
+
+    disk_history = [
+        row[3]
+        for row in history
+    ][::-1]
+
+    # ==============================
+    # Render Dashboard
+    # ==============================
 
     return templates.TemplateResponse(
         request=request,
@@ -150,6 +214,11 @@ def dashboard(request: Request):
             "disk_history": disk_history
         }
     )
+
+
+# ==============================
+# Website History API
+# ==============================
 
 @app.get("/website-history")
 def website_history():
